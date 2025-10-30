@@ -1,4 +1,4 @@
-// api/chat.js (Backend Logic - Sửa lỗi bằng cách gọi HTTP trực tiếp)
+// api/chat.js (Backend Logic - Sửa lỗi 404 Not Found)
 
 // Lấy API Key (Vercel sẽ tự động dùng 1 trong 2 key bạn đã đặt)
 const API_KEY = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
@@ -17,8 +17,8 @@ export default async function handler(request, response) {
 
         const prompt = `Bạn là một trợ lý AI tổng quát, hãy trả lời câu hỏi sau bằng tiếng Việt: "${keyword}".`;
 
-        // URL gọi API trực tiếp (giống như Apps Script)
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`;
+        // *** SỬA LỖI 404: Đổi mô hình thành 'gemini-1.5-flash-latest' ***
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${API_KEY}`;
 
         const payload = {
           contents: [{ parts: [{ text: prompt }] }],
@@ -30,7 +30,7 @@ export default async function handler(request, response) {
           ]
         };
 
-        // Dùng 'fetch' (Node.js) thay vì thư viện @google/genai
+        // Dùng 'fetch' (Node.js)
         const apiResponse = await fetch(url, {
             method: "POST",
             headers: {
@@ -39,14 +39,11 @@ export default async function handler(request, response) {
             body: JSON.stringify(payload),
         });
 
-        // Kiểm tra lỗi (ví dụ: API Key sai)
+        // Kiểm tra lỗi (ví dụ: API Key sai 400 hoặc URL sai 404)
         if (!apiResponse.ok) {
-            const errorText = await apiResponse.text();
-            console.error("LỖI API KEY:", errorText);
-            if (apiResponse.status === 400) {
-                 return response.status(401).json({ error: "Lỗi API Key: Key không hợp lệ. Vui lòng kiểm tra Vercel Settings." });
-            }
-            throw new Error(`Gemini API error! status: ${apiResponse.status}`);
+            const errorBody = await apiResponse.json(); // Lấy nội dung lỗi từ Google
+            console.error("LỖI GOOGLE API:", JSON.stringify(errorBody));
+            throw new Error(`Lỗi Google API: ${apiResponse.status} - ${errorBody.error.message}`);
         }
 
         const result = await apiResponse.json();
