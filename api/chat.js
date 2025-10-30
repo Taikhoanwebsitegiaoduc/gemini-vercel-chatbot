@@ -1,10 +1,9 @@
 // api/chat.js (Backend Logic - Vercel Serverless Function)
 
-// SỬA ĐỔI QUAN TRỌNG: Gọi trực tiếp hàm GenerateContent thay vì dùng 'new GoogleGenAI'
+// Sửa lỗi cú pháp gọi API
 import { GoogleGenAI } from "@google/genai";
 
-// Lấy API Key từ biến môi trường (Environment Variable)
-// Tên biến GEMINI_API_KEY đã được Vercel tự động nhận
+// Khởi tạo đối tượng client
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // Hàm xử lý chính cho Serverless Function
@@ -22,10 +21,11 @@ export default async function handler(request, response) {
 
         const prompt = `Bạn là một trợ lý AI tổng quát, hãy trả lời câu hỏi sau bằng tiếng Việt: "${keyword}".`;
 
-        // *** SỬA LỖI: Gọi phương thức generateContent của đối tượng 'ai.models' ***
-        const geminiResponse = await ai.models.generateContent({ 
-            model: "gemini-pro", // Dùng mô hình pro để có kết quả chất lượng hơn
-            contents: [{ parts: [{ text: prompt }] }],
+        // *** SỬA LỖI CUỐI CÙNG: Gọi phương thức generateContent của đối tượng 'ai' ***
+        // Trong các phiên bản thư viện mới nhất, cú pháp gọi đã được đơn giản hóa
+        const geminiResponse = await ai.generateContent({ 
+            model: "gemini-pro", 
+            contents: [prompt], // Cú pháp contents: [prompt] được đơn giản hóa
             safetySettings: [
                 { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
                 { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -34,23 +34,25 @@ export default async function handler(request, response) {
             ]
         });
 
-        // Đảm bảo có phản hồi hợp lệ
-        if (geminiResponse.candidates && geminiResponse.candidates.length > 0) {
-            const answer = geminiResponse.candidates[0].content.parts[0].text;
+        const answer = geminiResponse.text;
+
+        if (answer) {
             return response.status(200).json({ answer: answer });
         } else {
-            return response.status(500).json({ error: "Lỗi: Gemini API không trả về nội dung." });
+            return response.status(500).json({ error: "Lỗi: Gemini API không trả về nội dung hợp lệ." });
         }
 
     } catch (error) {
-        console.error("Gemini API Error:", error);
-        // THÔNG BÁO LỖI RÕ HƠN NẾU KEY BỊ LỖI
+        console.error("Gemini API Lỗi (FATAL):", error);
         if (error.message.includes("API key not valid")) {
-            return response.status(401).json({ error: "Lỗi API Key: Vui lòng kiểm tra lại GEMINI_API_KEY." });
+            return response.status(401).json({ error: "Lỗi API Key: Vui lòng kiểm tra lại GEMINI_API_KEY ở Vercel Settings." });
+        }
+        if (error.message.includes("400")) {
+             return response.status(400).json({ error: "Lỗi API 400: Yêu cầu không hợp lệ. Có thể do Prompt/Model." });
         }
 
         return response.status(500).json({ 
-            error: "Lỗi Serverless Function. Vui lòng kiểm tra log Vercel.", 
+            error: "Lỗi Serverless Function. Chi tiết đã được ghi vào Vercel Logs.", 
             details: error.message 
         });
     }
