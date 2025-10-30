@@ -3,13 +3,13 @@
 import { GoogleGenAI } from "@google/genai";
 
 // 1. Khởi tạo client với API Key
-// Key sẽ được lấy từ biến môi trường GOOGLE_API_KEY hoặc GEMINI_API_KEY
+// Code sẽ tự động lấy 1 trong 2 key bạn đã thiết lập (GEMINI_API_KEY hoặc GOOGLE_API_KEY)
 const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
 
 // 2. Lấy mô hình (model)
 // Chúng ta lấy model ở đây một lần để tái sử dụng
 const model = genAI.getGenerativeModel({ 
-  model: "gemini-pro",
+  model: "gemini-pro", // Sử dụng gemini-pro cho ổn định
   safetySettings: [
     { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
     { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
