@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chatbot Gemini - Vercel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; background-color: #f7f7f7; }
+        h1 { color: #007bff; text-align: center; margin-bottom: 20px; }
+        #chat-container { 
+            border: 1px solid #ccc; 
+            height: 400px; 
+            overflow-y: scroll; 
+            padding: 10px; 
+            margin-bottom: 10px; 
+            background-color: #fff;
+            border-radius: 8px;
+        }
+        .message { padding: 8px 12px; margin: 5px 0; border-radius: 18px; max-width: 85%; line-height: 1.4; }
+        .user { background-color: #007bff; color: white; margin-left: auto; text-align: left; border-bottom-right-radius: 4px; }
+        .ai { background-color: #e9ecef; color: #333; margin-right: auto; text-align: left; border-bottom-left-radius: 4px; }
+        #input-area { display: flex; }
+        #query-input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 20px; margin-right: 5px; font-size: 16px; }
+        button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 20px; cursor: pointer; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <h1>Trợ lý AI Gemini (Tốc độ cao)</h1>
+    <div id="chat-container">
+        <div class="message ai">Xin chào! Bạn có câu hỏi nào không?</div>
+    </div>
+    <div id="input-area">
+        <input type="text" id="query-input" placeholder="Nhập câu hỏi..." onkeydown="if(event.key === 'Enter') submitQuery()">
+        <button onclick="submitQuery()">Gửi</button>
+    </div>
+
+    <script>
+        async function submitQuery() {
+            const queryInput = document.getElementById('query-input');
+            const query = queryInput.value;
+            if (!query.trim()) return;
+
+            appendMessage(query, 'user');
+            queryInput.value = '';
+
+            const waitingId = 'msg-' + Date.now();
+            appendMessage("Đang xử lý, vui lòng chờ...", 'ai', waitingId);
+
+            try {
+                // GỌI VERCEL SERVERLESS FUNCTION TẠI ĐƯỜNG DẪN /api/chat
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ keyword: query })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                updateMessage(waitingId, data.answer || "Lỗi: Gemini không phản hồi.");
+
+            } catch (error) {
+                updateMessage(waitingId, `Lỗi: Không thể nhận phản hồi từ AI. Chi tiết: ${error.message}`);
+            }
+        }
+
+        function appendMessage(text, sender, id = null) {
+            const container = document.getElementById('chat-container');
+            const p = document.createElement('div');
+            p.className = `message ${sender}`;
+            p.innerText = text;
+            if (id) p.id = id;
+            container.appendChild(p);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function updateMessage(id, newText) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.innerText = newText;
+            }
+        }
+    </script>
+</body>
+</html>
