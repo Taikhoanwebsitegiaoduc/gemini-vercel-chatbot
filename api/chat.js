@@ -17,9 +17,8 @@ export default async function handler(request, response) {
 
         const prompt = `Bạn là một trợ lý AI tổng quát, hãy trả lời câu hỏi sau bằng tiếng Việt: "${keyword}".`;
 
-        // *** SỬA LỖI 404: Đổi mô hình thành 'gemini-1.0-pro' (bản ổn định) ***
-        // Chúng ta dùng tên 'gemini-1.0-pro' vì 'gemini-pro' không còn được hỗ trợ
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent?key=${API_KEY}`;
+        // *** SỬA LỖI 404: Chuyển sang API v1 (ổn định) và model gemini-pro ***
+        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${API_KEY}`;
 
         const payload = {
           contents: [{ parts: [{ text: prompt }] }],
@@ -44,6 +43,10 @@ export default async function handler(request, response) {
         if (!apiResponse.ok) {
             const errorBody = await apiResponse.json(); // Lấy nội dung lỗi từ Google
             console.error("LỖI GOOGLE API:", JSON.stringify(errorBody));
+            // Lỗi 400 thường là do API Key sai
+            if (apiResponse.status === 400) {
+                 return response.status(401).json({ error: "Lỗi API Key: Key không hợp lệ. Vui lòng kiểm tra Vercel Settings." });
+            }
             throw new Error(`Lỗi Google API: ${apiResponse.status} - ${errorBody.error.message}`);
         }
 
