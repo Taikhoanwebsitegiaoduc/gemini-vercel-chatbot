@@ -1,10 +1,22 @@
 // api/chat.js (Backend Logic - Vercel Serverless Function)
 
-// Sửa lỗi cú pháp gọi API
 import { GoogleGenAI } from "@google/genai";
 
-// Khởi tạo đối tượng client
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// 1. Khởi tạo client với API Key
+// Key sẽ được lấy từ biến môi trường GOOGLE_API_KEY hoặc GEMINI_API_KEY
+const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
+
+// 2. Lấy mô hình (model)
+// Chúng ta lấy model ở đây một lần để tái sử dụng
+const model = genAI.getGenerativeModel({ 
+  model: "gemini-pro",
+  safetySettings: [
+    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+  ]
+});
 
 // Hàm xử lý chính cho Serverless Function
 export default async function handler(request, response) {
@@ -21,20 +33,10 @@ export default async function handler(request, response) {
 
         const prompt = `Bạn là một trợ lý AI tổng quát, hãy trả lời câu hỏi sau bằng tiếng Việt: "${keyword}".`;
 
-        // *** SỬA LỖI CUỐI CÙNG: Gọi phương thức generateContent của đối tượng 'ai' ***
-        // Trong các phiên bản thư viện mới nhất, cú pháp gọi đã được đơn giản hóa
-        const geminiResponse = await ai.generateContent({ 
-            model: "gemini-pro", 
-            contents: [prompt], // Cú pháp contents: [prompt] được đơn giản hóa
-            safetySettings: [
-                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-            ]
-        });
-
-        const answer = geminiResponse.text;
+        // 3. SỬA LỖI: Gọi hàm generateContent từ đối tượng 'model' đã lấy ở trên
+        const result = await model.generateContent(prompt);
+        const geminiResponse = await result.response;
+        const answer = geminiResponse.text(); // Lấy nội dung text từ phản hồi
 
         if (answer) {
             return response.status(200).json({ answer: answer });
@@ -44,11 +46,10 @@ export default async function handler(request, response) {
 
     } catch (error) {
         console.error("Gemini API Lỗi (FATAL):", error);
+
+        // Báo lỗi rõ ràng nếu là API Key
         if (error.message.includes("API key not valid")) {
             return response.status(401).json({ error: "Lỗi API Key: Vui lòng kiểm tra lại GEMINI_API_KEY ở Vercel Settings." });
-        }
-        if (error.message.includes("400")) {
-             return response.status(400).json({ error: "Lỗi API 400: Yêu cầu không hợp lệ. Có thể do Prompt/Model." });
         }
 
         return response.status(500).json({ 
