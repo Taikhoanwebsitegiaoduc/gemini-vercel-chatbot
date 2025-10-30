@@ -2,12 +2,14 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-// 1. Khởi tạo client với API Key
-// Code sẽ tự động lấy 1 trong 2 key bạn đã thiết lập (GEMINI_API_KEY hoặc GOOGLE_API_KEY)
-const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
+// 1. Lấy API Key (chỉ 1 key là đủ)
+const API_KEY = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
 
-// 2. Lấy mô hình (model)
-// Chúng ta lấy model ở đây một lần để tái sử dụng
+// 2. Khởi tạo client
+const genAI = new GoogleGenAI(API_KEY);
+
+// 3. Lấy mô hình (model)
+// Đây là cú pháp đúng để lấy model
 const model = genAI.getGenerativeModel({ 
   model: "gemini-pro", // Sử dụng gemini-pro cho ổn định
   safetySettings: [
@@ -33,23 +35,23 @@ export default async function handler(request, response) {
 
         const prompt = `Bạn là một trợ lý AI tổng quát, hãy trả lời câu hỏi sau bằng tiếng Việt: "${keyword}".`;
 
-        // 3. SỬA LỖI: Gọi hàm generateContent từ đối tượng 'model' đã lấy ở trên
+        // 4. SỬA LỖI: Gọi hàm generateContent từ đối tượng 'model'
         const result = await model.generateContent(prompt);
         const geminiResponse = await result.response;
-        const answer = geminiResponse.text(); // Lấy nội dung text từ phản hồi
+        const answer = geminiResponse.text(); // Lấy nội dung text
 
         if (answer) {
             return response.status(200).json({ answer: answer });
         } else {
-            return response.status(500).json({ error: "Lỗi: Gemini API không trả về nội dung hợp lệ." });
+            return response.status(500).json({ error: "Lỗi: Gemini API không trả về nội dung." });
         }
 
     } catch (error) {
-        console.error("Gemini API Lỗi (FATAL):", error);
+        // Ghi lại lỗi chi tiết ra Vercel Logs
+        console.error("LỖI SERVERLESS:", error); 
 
-        // Báo lỗi rõ ràng nếu là API Key
-        if (error.message.includes("API key not valid")) {
-            return response.status(401).json({ error: "Lỗi API Key: Vui lòng kiểm tra lại GEMINI_API_KEY ở Vercel Settings." });
+        if (error.message && error.message.includes("API key not valid")) {
+            return response.status(401).json({ error: "Lỗi API Key: Key không hợp lệ. Vui lòng kiểm tra Vercel Settings." });
         }
 
         return response.status(500).json({ 
