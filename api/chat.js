@@ -17,8 +17,9 @@ export default async function handler(request, response) {
 
         const prompt = `Bạn là một trợ lý AI tổng quát, hãy trả lời câu hỏi sau bằng tiếng Việt: "${keyword}".`;
 
-        // *** SỬA LỖI 404: Đổi mô hình thành 'gemini-1.5-flash-latest' ***
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${API_KEY}`;
+        // *** SỬA LỖI 404: Đổi mô hình thành 'gemini-1.0-pro' (bản ổn định) ***
+        // Chúng ta dùng tên 'gemini-1.0-pro' vì 'gemini-pro' không còn được hỗ trợ
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent?key=${API_KEY}`;
 
         const payload = {
           contents: [{ parts: [{ text: prompt }] }],
@@ -53,8 +54,9 @@ export default async function handler(request, response) {
           const answer = result.candidates[0].content.parts[0].text;
           return response.status(200).json({ answer: answer });
         } else {
-          console.error("LỖI PHẢN HỒI GEMINI:", JSON.stringify(result));
-          return response.status(500).json({ error: "Lỗi: Gemini API không trả về nội dung.", details: result.promptFeedback?.blockReason || "Không rõ" });
+          // Lỗi này xảy ra nếu nội dung bị chặn (Safety Settings)
+          console.error("LỖI PHẢN HỒI GEMINI (Bị chặn?):", JSON.stringify(result));
+          return response.status(500).json({ error: "Lỗi: Gemini API không trả về nội dung.", details: result.promptFeedback?.blockReason || "Nội dung bị chặn" });
         }
 
     } catch (error) {
