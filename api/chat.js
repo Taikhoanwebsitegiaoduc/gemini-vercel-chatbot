@@ -1,24 +1,7 @@
-// api/chat.js (Backend Logic - Vercel Serverless Function)
+// api/chat.js (Backend Logic - Sửa lỗi bằng cách gọi HTTP trực tiếp)
 
-import { GoogleGenAI } from "@google/genai";
-
-// 1. Lấy API Key (chỉ 1 key là đủ)
+// Lấy API Key (Vercel sẽ tự động dùng 1 trong 2 key bạn đã đặt)
 const API_KEY = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
-
-// 2. Khởi tạo client
-const genAI = new GoogleGenAI(API_KEY);
-
-// 3. Lấy mô hình (model)
-// Đây là cú pháp đúng để lấy model
-const model = genAI.getGenerativeModel({ 
-  model: "gemini-pro", // Sử dụng gemini-pro cho ổn định
-  safetySettings: [
-    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-  ]
-});
 
 // Hàm xử lý chính cho Serverless Function
 export default async function handler(request, response) {
@@ -27,33 +10,58 @@ export default async function handler(request, response) {
     }
 
     try {
-        const { keyword } = request.body; // Nhận keyword từ Frontend
-
+        const { keyword } = request.body;
         if (!keyword) {
             return response.status(400).json({ error: 'Vui lòng nhập từ khóa.' });
         }
 
         const prompt = `Bạn là một trợ lý AI tổng quát, hãy trả lời câu hỏi sau bằng tiếng Việt: "${keyword}".`;
 
-        // 4. SỬA LỖI: Gọi hàm generateContent từ đối tượng 'model'
-        const result = await model.generateContent(prompt);
-        const geminiResponse = await result.response;
-        const answer = geminiResponse.text(); // Lấy nội dung text
+        // URL gọi API trực tiếp (giống như Apps Script)
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`;
 
-        if (answer) {
-            return response.status(200).json({ answer: answer });
+        const payload = {
+          contents: [{ parts: [{ text: prompt }] }],
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+          ]
+        };
+
+        // Dùng 'fetch' (Node.js) thay vì thư viện @google/genai
+        const apiResponse = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+        });
+
+        // Kiểm tra lỗi (ví dụ: API Key sai)
+        if (!apiResponse.ok) {
+            const errorText = await apiResponse.text();
+            console.error("LỖI API KEY:", errorText);
+            if (apiResponse.status === 400) {
+                 return response.status(401).json({ error: "Lỗi API Key: Key không hợp lệ. Vui lòng kiểm tra Vercel Settings." });
+            }
+            throw new Error(`Gemini API error! status: ${apiResponse.status}`);
+        }
+
+        const result = await apiResponse.json();
+
+        // Trích xuất câu trả lời
+        if (result.candidates && result.candidates.length > 0) {
+          const answer = result.candidates[0].content.parts[0].text;
+          return response.status(200).json({ answer: answer });
         } else {
-            return response.status(500).json({ error: "Lỗi: Gemini API không trả về nội dung." });
+          console.error("LỖI PHẢN HỒI GEMINI:", JSON.stringify(result));
+          return response.status(500).json({ error: "Lỗi: Gemini API không trả về nội dung.", details: result.promptFeedback?.blockReason || "Không rõ" });
         }
 
     } catch (error) {
-        // Ghi lại lỗi chi tiết ra Vercel Logs
-        console.error("LỖI SERVERLESS:", error); 
-
-        if (error.message && error.message.includes("API key not valid")) {
-            return response.status(401).json({ error: "Lỗi API Key: Key không hợp lệ. Vui lòng kiểm tra Vercel Settings." });
-        }
-
+        console.error("LỖI SERVERLESS (fetch):", error);
         return response.status(500).json({ 
             error: "Lỗi Serverless Function. Chi tiết đã được ghi vào Vercel Logs.", 
             details: error.message 
