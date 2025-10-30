@@ -1,0 +1,8 @@
+{
+  "name": "gemini-vercel-chatbot",
+  "version": "1.0.0",
+  "dependencies": {
+    "@google/genai": "^0.14.2"
+  },
+  "type": "module"
+}
